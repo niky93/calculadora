@@ -1,0 +1,72 @@
+﻿trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  dotnetVersion: '8.0.x'
+
+stages:
+- stage: CI
+  displayName: 'CI'
+  jobs:
+  - job: BuildJob
+    displayName: 'BuildJob'
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Instalar .NET SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '$(dotnetVersion)'
+    - script: dotnet restore Calculadora.csproj
+      displayName: 'Restaurar dependencias'
+    - script: dotnet build Calculadora.csproj --configuration $(buildConfiguration) --no-restore
+      displayName: 'Compilar aplicacion'
+
+- stage: Testing
+  displayName: 'Testing'
+  dependsOn: CI
+  condition: succeeded()
+  jobs:
+  - job: TestJob
+    displayName: 'TestJob'
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Instalar .NET SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '$(dotnetVersion)'
+    - script: dotnet test Calculadora.Tests/Calculadora.Tests.csproj --configuration $(buildConfiguration) --logger trx --results-directory $(Agent.TempDirectory)/TestResults
+      displayName: 'Ejecutar pruebas unitarias'
+    - task: PublishTestResults@2
+      displayName: 'Mostrar resultados'
+      inputs:
+        testResultsFormat: 'VSTest'
+        testResultsFiles: '$(Agent.TempDirectory)/TestResults/*.trx'
+        failTaskOnFailedTests: true
+      condition: succeededOrFailed()
+
+- stage: Delivery
+  displayName: 'Delivery'
+  dependsOn: Testing
+  condition: succeeded()
+  jobs:
+  - job: DeliveryJob
+    displayName: 'DeliveryJob'
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Instalar .NET SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '$(dotnetVersion)'
+    - script: dotnet publish Calculadora.csproj --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/app
+      displayName: 'Publicar aplicacion'
+    - task: PublishPipelineArtifact@1
+      displayName: 'Generar artefactos'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/app'
+        artifact: 'Calculadora'
+    - script: echo "Entrega preparada correctamente."
+      displayName: 'Confirmar entrega'
