@@ -7,42 +7,42 @@ variables:
 
 stages:
 - stage: CI
-  displayName: 'CI'
+  displayName: 'Stage 1: CI - Integracion Continua'
   jobs:
   - job: BuildJob
-    displayName: 'BuildJob'
+    displayName: 'BuildJob - Compilar aplicacion'
     pool:
       vmImage: 'ubuntu-latest'
     steps:
     - task: UseDotNet@2
-      displayName: 'Instalar .NET SDK'
+      displayName: 'Instalar SDK .NET 8'
       inputs:
         packageType: 'sdk'
         version: '$(dotnetVersion)'
     - script: dotnet restore Calculadora.csproj
-      displayName: 'Restaurar dependencias'
+      displayName: 'Restaurar paquetes NuGet'
     - script: dotnet build Calculadora.csproj --configuration $(buildConfiguration) --no-restore
       displayName: 'Compilar aplicacion'
 
 - stage: Testing
-  displayName: 'Testing'
+  displayName: 'Stage 2: Testing - Validacion'
   dependsOn: CI
   condition: succeeded()
   jobs:
   - job: TestJob
-    displayName: 'TestJob'
+    displayName: 'TestJob - Ejecutar pruebas'
     pool:
       vmImage: 'ubuntu-latest'
     steps:
     - task: UseDotNet@2
-      displayName: 'Instalar .NET SDK'
+      displayName: 'Instalar SDK .NET 8'
       inputs:
         packageType: 'sdk'
         version: '$(dotnetVersion)'
     - script: dotnet test Calculadora.Tests/Calculadora.Tests.csproj --configuration $(buildConfiguration) --logger trx --results-directory $(Agent.TempDirectory)/TestResults
       displayName: 'Ejecutar pruebas unitarias'
     - task: PublishTestResults@2
-      displayName: 'Mostrar resultados'
+      displayName: 'Publicar resultados de pruebas'
       inputs:
         testResultsFormat: 'VSTest'
         testResultsFiles: '$(Agent.TempDirectory)/TestResults/*.trx'
@@ -50,24 +50,24 @@ stages:
       condition: succeededOrFailed()
 
 - stage: Delivery
-  displayName: 'Delivery'
+  displayName: 'Stage 3: Delivery - Entrega'
   dependsOn: Testing
   condition: succeeded()
   jobs:
   - job: DeliveryJob
-    displayName: 'DeliveryJob'
+    displayName: 'DeliveryJob - Preparar entrega'
     pool:
       vmImage: 'ubuntu-latest'
     steps:
     - task: UseDotNet@2
-      displayName: 'Instalar .NET SDK'
+      displayName: 'Instalar SDK .NET 8'
       inputs:
         packageType: 'sdk'
         version: '$(dotnetVersion)'
     - script: dotnet publish Calculadora.csproj --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/app
       displayName: 'Publicar aplicacion'
     - task: PublishPipelineArtifact@1
-      displayName: 'Generar artefactos'
+      displayName: 'Publicar artefacto del pipeline'
       inputs:
         targetPath: '$(Build.ArtifactStagingDirectory)/app'
         artifact: 'Calculadora'
